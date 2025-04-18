@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Collaborative Text Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="wrapper">
+        <textarea id="editor"></textarea>
+        <div id="overlay"></div>
+        <div id="userList">
+            <h3>Online Users:</h3>
+            <ul id="userListItems"></ul>
+        </div>
+    </div>
+
+    <script>
+        const serverIp = window.location.hostname || 'localhost';
+        const ws = new WebSocket(`ws://10.200.242.241:8765`);
+
+        const textarea = document.getElementById('editor');
+        const overlay = document.getElementById('overlay');
+        const userListItems = document.getElementById('userListItems');
+
+        let clientId = "user" + Math.floor(Math.random() * 1000);
+        let version = 0;
+        let suppress = false;
+        let prev = "";
+        let cursors = {};
+        let colors = {};
+        let pingTimestamps = {};
+        let pings = {};
+
+        function getCursorPos() {
+            return textarea.selectionStart;
+        }
+
+
+        function renderCursors() {
+  overlay.innerHTML = "";
+  const text = textarea.value;
+  const textareaRect = textarea.getBoundingClientRect();
+  
+  for (const [user, pos] of Object.entries(cursors)) {
+    if (user === clientId || pos == null) continue;
+    
+    // Calculate cursor position using getCaretCoordinates
+    const coordinates = getCaretCoordinates(textarea, pos);
+    
+    // Create cursor element
+    const cursorWrapper = document.createElement("div");
+    cursorWrapper.className = "cursor-marker";
+    cursorWrapper.style.left = `${coordinates.left}px`;
+    cursorWrapper.style.top = `${coordinates.top}px`;
+    cursorWrapper.style.height = `${coordinates.height}px`;
+    cursorWrapper.style.backgroundColor = colors[user] || "#000";
+    
+    // Create user label
+    const label = document.createElement("span");
+    label.textContent = user;
+    label.style.position = "absolute";
+    label.style.top = "-18px";
+    label.style.left = "0";
+    label.style.backgroundColor = colors[user] || "#000";
+    label.style.color = "#fff";
+    label.style.fontSize = "0.75em";
+    label.style.padding = "2px 6px";
+    label.style.borderRadius = "4px";
+    label.style.whiteSpace = "nowrap";
+    
+    cursorWrapper.appendChild(label);
+    overlay.appendChild(cursorWrapper);
+  }
+}
+
+// Function to get caret coordinates in a textarea
+// This handles word wrapping correctly
+function getCaretCoordinates(element, position) {
+  // Create a mirror div to copy textarea's styles
+  const mirror = document.createElement('div');
+  const style = window.getComputedStyle(element);
+  
+  // Copy styles that affect text layout
+  mirror.style.cssText = [
+    'position: absolute',
+    'visibility: hidden',
+    'height: auto',
+    'width: ' + element.clientWidth + 'px',
+    'white-space: pre-wrap',
+    'word-wrap: break-word',
+    'border-width: ' + style.borderWidth,
+    'padding: ' + style.padding,
+    'font: ' + style.font,
+    'line-height: ' + style.lineHeight,
+    'box-sizing: border-box'
+  ].join(';');
+  
+  // Split text at cursor position
+  const textBeforeCaret = element.value.substring(0, position);
+  const textAfterCaret = element.value.substring(position);
+  
+  // Create spans for text before and after caret
+  const preSpan = document.createElement('span');
+  preSpan.textContent = textBeforeCaret;
+  
+  const caretSpan = document.createElement('span');
+  caretSpan.textContent = '|'; // Placeholder character
+  caretSpan.id = 'caret-position-marker';
+  
+  const postSpan = document.createElement('span');
+  postSpan.textContent = textAfterCaret;
+  
+  // Append elements to mirror
+  mirror.appendChild(preSpan);
+  mirror.appendChild(caretSpan);
+  mirror.appendChild(postSpan);
+  document.body.appendChild(mirror);
+  
+  // Get the position of the caret marker
+  const caretMarker = document.getElementById('caret-position-marker');
+  const markerRect = caretMarker.getBoundingClientRect();
+  const mirrorRect = mirror.getBoundingClientRect();
+  
+  // Calculate coordinates relative to textarea
+  const coordinates = {
+    top: markerRect.top - mirrorRect.top,
+    left: markerRect.left - mirrorRect.left,
+    height: parseFloat(style.lineHeight) || markerRect.height
+  };
+  
+  // Clean up
+  document.body.removeChild(mirror);
+  
+  return coordinates;
+}
+
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ 
+                type: "init", 
+                author: clientId 
+            }));
+        };
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === "init") {
+                version = msg.version;
+                suppress = true;
+                textarea.value = msg.doc;
+                prev = msg.doc;
+                cursors = msg.cursors || {};
+                colors = msg.colors || {};
+                pings = msg.pings || {};
+                renderCursors();
+                suppress = false;
+            } 
+            else if (msg.type === "edit") {
+                if (msg.author === clientId) return;
+                const op = msg.op;
+                suppress = true;
+                if (op.action === "insert") {
+                    textarea.value = textarea.value.slice(0, op.pos) + op.char + textarea.value.slice(op.pos);
+                } 
+                else if (op.action === "delete") {
+                    textarea.value = textarea.value.slice(0, op.pos) + textarea.value.slice(op.pos + 1);
+                }
+                prev = textarea.value;
+                suppress = false;
+                version = msg.version;
+            } 
+            else if (msg.type === "cursor") {
+                if (msg.author !== clientId) {
+                    cursors[msg.author] = msg.pos;
+                    colors[msg.author] = msg.color;
+                    renderCursors();
+                }
+            }
+            else if (msg.type === "cursor_update") {
+                cursors = msg.cursors || {};
+                colors = msg.colors || {};
+                renderCursors();
+            }
+            else if (msg.type === "ping") {
+                // Respond to ping with timestamp
+                ws.send(JSON.stringify({
+                    type: "pong",
+                    author: clientId,
+                    timestamp: msg.timestamp
+                }));
+            }
+            else if (msg.type === "user_update") {
+                userListItems.innerHTML = "";
+                const pingMap = msg.pings || {};
+                msg.users.forEach(user => {
+                    const li = document.createElement("li");
+
+                    const dot = document.createElement("div");
+                    dot.className = "online-dot";
+
+                    const name = document.createElement("span");
+                    name.textContent = user;
+
+                    const pingSpan = document.createElement("span");
+                    pingSpan.className = "ping-value";
+                    const ping = pingMap[user];
+                    if (ping !== undefined) {
+                        pingSpan.textContent = `${ping} ms`;
+                        if (ping <= 100) {
+                            dot.style.backgroundColor = "rgb(0, 223, 0)";
+                        } else if (ping <= 250) {
+                            dot.style.backgroundColor = "rgb(223, 179, 0)";
+                        } else {
+                            dot.style.backgroundColor = "rgb(255, 20, 20)";
+                        }
+                    }
+
+                    li.appendChild(dot);
+                    li.appendChild(name);
+                    li.appendChild(pingSpan);
+                    userListItems.appendChild(li);
+                });
+            }
+        };
+
+        function sendCursorUpdate() {
+            const pos = getCursorPos();
+            ws.send(JSON.stringify({
+                type: "cursor",
+                author: clientId,
+                pos: pos
+            }));
+        }
+
+        textarea.addEventListener("input", () => {
+            if (suppress) return;
+            const newText = textarea.value;
+            
+            let start = 0;
+            while (start < prev.length && start < newText.length && prev[start] === newText[start]) {
+                start++;
+            }
+
+            let endPrev = prev.length - 1;
+            let endNew = newText.length - 1;
+            while (endPrev >= start && endNew >= start && prev[endPrev] === newText[endNew]) {
+                endPrev--;
+                endNew--;
+            }
+
+            if (endPrev >= start) {
+                ws.send(JSON.stringify({
+                    type: "edit",
+                    op: { action: "delete", pos: start },
+                    author: clientId
+                }));
+            }
+
+            if (endNew >= start) {
+                const insertedText = newText.slice(start, endNew + 1);
+                for (let i = 0; i < insertedText.length; i++) {
+                    ws.send(JSON.stringify({
+                        type: "edit",
+                        op: { 
+                            action: "insert", 
+                            char: insertedText[i], 
+                            pos: start + i 
+                        },
+                        author: clientId
+                    }));
+                }
+            }
+
+            prev = newText;
+            sendCursorUpdate();
+        });
+
+        textarea.addEventListener("click", sendCursorUpdate);
+        textarea.addEventListener("keyup", sendCursorUpdate);
+    </script>
+</body>
+</html>
