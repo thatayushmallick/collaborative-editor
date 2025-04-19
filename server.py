@@ -4,6 +4,9 @@ import json
 import random
 import time
 import socket
+# Add these imports at the top of your file
+import dns.resolver
+import traceback
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -16,13 +19,61 @@ def get_local_ip():
         s.close()
     return local_ip
 
+# Add to global variables at the top of server.py
 DOCUMENT = ""
 VERSION = 0
+OPERATIONS = []  # History of operations
 CLIENTS = set()
 CURSORS = {}
 CLIENT_IDS = {}
 CLIENT_COLORS = {}
 CLIENT_PINGS = {}  # {client_id: ping_in_ms}
+
+def transform_operation(op1, op2):
+    """Transform op1 against op2."""
+    if op1["action"] == "insert" and op2["action"] == "insert":
+        if op1["pos"] <= op2["pos"]:
+            return op1  # No change needed
+        else:
+            return {
+                "action": "insert",
+                "pos": op1["pos"] + len(op2["char"]),
+                "char": op1["char"],
+                "author": op1["author"]
+            }
+    
+    elif op1["action"] == "insert" and op2["action"] == "delete":
+        if op1["pos"] <= op2["pos"]:
+            return op1  # No change needed
+        else:
+            return {
+                "action": "insert",
+                "pos": op1["pos"] - 1,
+                "char": op1["char"],
+                "author": op1["author"]
+            }
+    
+    elif op1["action"] == "delete" and op2["action"] == "insert":
+        if op1["pos"] < op2["pos"]:
+            return op1  # No change needed
+        else:
+            return {
+                "action": "delete",
+                "pos": op1["pos"] + len(op2["char"]),
+                "author": op1["author"]
+            }
+    
+    elif op1["action"] == "delete" and op2["action"] == "delete":
+        if op1["pos"] < op2["pos"]:
+            return op1  # No change needed
+        elif op1["pos"] > op2["pos"]:
+            return {
+                "action": "delete",
+                "pos": op1["pos"] - 1,
+                "author": op1["author"]
+            }
+        else:
+            return None  # Both operations delete the same character
 
 def generate_color():
     r = random.randint(50, 255)
@@ -39,7 +90,8 @@ async def broadcast_user_update():
     await broadcast(json.dumps({
         "type": "user_update",
         "users": list(CLIENT_IDS.values()),
-        "pings": CLIENT_PINGS
+        "pings": CLIENT_PINGS,
+        "colors": CLIENT_COLORS 
     }))
 
 async def handle_message(ws, msg):
@@ -49,36 +101,67 @@ async def handle_message(ws, msg):
 
     if msg_type == "init":
         client_id = data["author"]
+        while client_id in CLIENT_IDS.values():
+            client_id = client_id + str(random.randint(1,1000))
+        
         CLIENT_IDS[ws] = client_id
         CLIENT_COLORS[client_id] = generate_color()
+        
         print(f"New connection: {client_id}")
+        
+        # Send initial state with version information
         await ws.send(json.dumps({
             "type": "init",
             "doc": DOCUMENT,
             "version": VERSION,
             "cursors": CURSORS,
             "colors": CLIENT_COLORS,
-            "pings": CLIENT_PINGS
+            "pings": CLIENT_PINGS,
+            # Only send recent operations (last 50 or fewer)
+            "operations": OPERATIONS[-50:] if len(OPERATIONS) > 50 else OPERATIONS
         }))
+        
         await broadcast_user_update()
-
     elif msg_type == "edit":
         op = data["op"]
         author = data["author"]
+        base_version = data.get("baseVersion", VERSION)
+        
+        # Transform operation against concurrent operations
+        if base_version < VERSION:
+            for i in range(base_version, VERSION):
+                concurrent_op = OPERATIONS[i]
+                if concurrent_op["author"] != author:  # Only transform against other users' ops
+                    op = transform_operation(op, concurrent_op)
+                    if op is None:  # Operation was nullified by transformation
+                        break
+        
+        if op:  # If operation wasn't nullified
+            if op["action"] == "insert":
+                DOCUMENT = DOCUMENT[:op["pos"]] + op["char"] + DOCUMENT[op["pos"]:]
+            elif op["action"] == "delete":
+                if 0 <= op["pos"] < len(DOCUMENT):
+                    DOCUMENT = DOCUMENT[:op["pos"]] + DOCUMENT[op["pos"] + 1:]
+            
+            # Store operation in history
+            OPERATIONS.append({
+                "action": op["action"],
+                "pos": op["pos"],
+                "char": op.get("char", ""),
+                "author": author,
+                "version": VERSION
+            })
+            
+            VERSION += 1
+            
+            # Broadcast transformed operation
+            await broadcast(json.dumps({
+                "type": "edit",
+                "op": op,
+                "version": VERSION,
+                "author": author
+            }), exclude=ws)
 
-        if op["action"] == "insert":
-            DOCUMENT = DOCUMENT[:op["pos"]] + op["char"] + DOCUMENT[op["pos"]:]
-        elif op["action"] == "delete":
-            if 0 <= op["pos"] < len(DOCUMENT):
-                DOCUMENT = DOCUMENT[:op["pos"]] + DOCUMENT[op["pos"] + 1:]
-
-        VERSION += 1
-        await broadcast(json.dumps({
-            "type": "edit",
-            "op": op,
-            "version": VERSION,
-            "author": author
-        }), exclude=ws)
 
     elif msg_type == "cursor":
         author = data["author"]
@@ -94,6 +177,82 @@ async def handle_message(ws, msg):
         latency_ms = int((time.time() - data["timestamp"]) * 1000)
         CLIENT_PINGS[data["author"]] = latency_ms
         await broadcast_user_update()
+    
+    elif msg_type == "dns_resolve":
+        domain = data.get("domain")
+        author = data.get("author")
+        
+        try:
+            # Create a resolver instance
+            resolver = dns.resolver.Resolver()
+            
+            # Get A records (IPv4 addresses)
+            a_records = []
+            try:
+                answers = resolver.resolve(domain, 'A')
+                for rdata in answers:
+                    a_records.append(rdata.to_text())
+            except Exception as e:
+                a_records = [f"Error retrieving A records: {str(e)}"]
+            
+            # Get AAAA records (IPv6 addresses)
+            aaaa_records = []
+            try:
+                answers = resolver.resolve(domain, 'AAAA')
+                for rdata in answers:
+                    aaaa_records.append(rdata.to_text())
+            except Exception:
+                aaaa_records = []
+            
+            # Get MX records (mail servers)
+            mx_records = []
+            try:
+                answers = resolver.resolve(domain, 'MX')
+                for rdata in answers:
+                    mx_records.append(f"{rdata.preference} {rdata.exchange}")
+            except Exception:
+                mx_records = []
+            
+            # Get NS records (name servers)
+            ns_records = []
+            try:
+                answers = resolver.resolve(domain, 'NS')
+                for rdata in answers:
+                    ns_records.append(rdata.to_text())
+            except Exception:
+                ns_records = []
+            
+            # Get TXT records
+            txt_records = []
+            try:
+                answers = resolver.resolve(domain, 'TXT')
+                for rdata in answers:
+                    txt_records.append(rdata.to_text())
+            except Exception:
+                txt_records = []
+            
+            # Send results back to client
+            await ws.send(json.dumps({
+                "type": "dns_result",
+                "domain": domain,
+                "a_records": a_records,
+                "aaaa_records": aaaa_records,
+                "mx_records": mx_records,
+                "ns_records": ns_records,
+                "txt_records": txt_records
+            }))
+            
+        except Exception as e:
+            error_message = str(e)
+            traceback_str = traceback.format_exc()
+            print(f"DNS resolution error: {error_message}")
+            print(traceback_str)
+            
+            await ws.send(json.dumps({
+                "type": "dns_result",
+                "domain": domain,
+                "error": error_message
+            }))
 
 async def handler(ws):
     CLIENTS.add(ws)
