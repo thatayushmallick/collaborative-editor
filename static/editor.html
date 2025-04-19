@@ -1,0 +1,48 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Collaborative Text Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+</head>
+<body>
+        <!-- Username input container -->
+    <div id="username-container">
+        <div class="username-box">
+            <h2>Enter Server IP and Your Name</h2>
+            <input type="text" id="server-input" placeholder="IP Addres">
+            <input type="text" id="username-input" placeholder="Your name">
+            <button id="join-button">Join</button>
+        </div>
+    </div>
+    <div id="wrapper" style="display: none;">
+        <textarea id="editor" placeholder="Start Typing..."></textarea>
+        <div id="overlay"></div>
+        <div id="userList">
+            <h3>Online Users:</h3>
+            <ul id="userListItems"></ul>
+        </div>
+    </div>
+    <div id="dns-resolver" style="display: none;">
+        <h3>DNS Resolver</h3>
+        <div class="dns-input-container">
+            <input type="text" id="domain-input" placeholder="Enter domain (e.g., google.com)">
+            <button id="resolve-button">Resolve</button>
+        </div>
+        <div id="dns-results">
+        </div>
+    </div>
+    <div id="ping-visualization" style="display: none;">
+        <h3>Connection Latency (Last 10 Seconds)</h3>
+        <div id="ping-chart-container">
+            <canvas id="ping-chart"></canvas>
+        </div>
+    </div>
+      
+    <script src="script.js"></script>
+
+</body>
+</html>

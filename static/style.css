@@ -1,0 +1,280 @@
+/* style.css */
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #e6e8eb;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+#wrapper {
+    display: flex;
+    position: relative;
+    width: 90%;
+    max-width: 1200px;
+    flex-grow: 50;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-radius: 14px;
+    overflow: hidden;
+    background-color: #fefefe;
+    height: calc(100vh - 40px);
+}
+
+#editorContainer {
+    position: relative;
+    flex: 1;
+}
+
+#editor {
+    width: 80%;
+    height: 100%;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 16px;
+    padding: 18px;
+    box-sizing: border-box;
+    font-family: 'Fira Code', monospace;
+    line-height: 1.4;
+    color: #2c2c2c;
+    background-color: #ffffff;
+    overflow: auto;
+    position: relative;
+}
+
+.cursor-marker {
+    position: absolute;
+    width: 2px;
+    height: 1.4em;
+    background-color: red;
+    animation: blink 1s step-start 0s infinite;
+    pointer-events: none;
+    z-index: 100;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 18px;
+    width: 80%;
+    height: 100%;
+    box-sizing: border-box;
+    pointer-events: none;
+    font-family: 'Fira Code', monospace;
+    font-size: 16px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    z-index: 10;
+}
+#userList {
+    width: 250px;
+    height: 100%;
+    background-color: #2e0500;
+    padding: 15px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    z-index: 5;
+    font-family: 'Helvetica';
+    border-left: #2c2c2c;
+    border-width: 15px;
+}
+
+#userList h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    color: #ffffff;
+}
+
+#userListItems {
+
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    line-height: 1.3;
+}
+
+#userListItems li {
+    display: flex;
+    align-items: center;
+    justify-content: left;
+    padding: 6px 0;
+    color: #fff;
+    width: auto;
+}
+
+.ping-value {
+    font-size: 0.8em;
+    color: #c7c7c7;
+    margin-left: auto;
+}
+
+
+.online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: rgb(255, 20, 20);
+    margin-right: 8px;
+}
+
+#mirror {
+    position: absolute;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    visibility: hidden;
+    overflow: hidden;
+    z-index: -1;
+}
+
+#username-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #e6e8eb;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.username-box {
+    background-color: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.username-box h2 {
+    margin-top: 0;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+
+
+#username-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+#server-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 15px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+#join-button {
+    background-color: #582000;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 15px;
+    font-size: 16px;
+    margin-top: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#join-button:hover {
+    background-color: #4b1c00;
+}
+
+#dns-resolver {
+    width: 80%;
+    margin: 20px auto;
+    padding: 15px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: block;
+  }
+  
+  #dns-resolver h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.2em;
+  }
+  
+  .dns-input-container {
+    display: flex;
+    margin-bottom: 10px;
+  }
+  
+  #domain-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+    font-size: 14px;
+  }
+  
+  #resolve-button {
+    background-color: #582000;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  #resolve-button:hover {
+    background-color: #4b1c00;
+  }
+  
+  #dns-results {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    min-height: 50px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+  }
+  
+  #ping-visualization {
+  width: 80%;
+  margin: 20px auto;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+#ping-visualization h3 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.2em;
+}
+
+#ping-chart-container {
+  height: 200px;
+  margin-top: 15px;
+}
