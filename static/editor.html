@@ -12,7 +12,8 @@
         <!-- Username input container -->
     <div id="username-container">
         <div class="username-box">
-            <h2>Enter Your Name</h2>
+            <h2>Enter Server IP and Your Name</h2>
+            <input type="text" id="server-input" placeholder="IP Addres">
             <input type="text" id="username-input" placeholder="Your name">
             <button id="join-button">Join</button>
         </div>
@@ -25,7 +26,7 @@
             <ul id="userListItems"></ul>
         </div>
     </div>
-    <div id="dns-resolver">
+    <div id="dns-resolver" style="display: none;">
         <h3>DNS Resolver</h3>
         <div class="dns-input-container">
             <input type="text" id="domain-input" placeholder="Enter domain (e.g., google.com)">
@@ -34,7 +35,7 @@
         <div id="dns-results">
         </div>
     </div>
-    <div id="ping-visualization">
+    <div id="ping-visualization" style="display: none;">
         <h3>Connection Latency (Last 10 Seconds)</h3>
         <div id="ping-chart-container">
             <canvas id="ping-chart"></canvas>

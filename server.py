@@ -43,12 +43,22 @@ def transform_operation(op1, op2):
             }
     
     elif op1["action"] == "insert" and op2["action"] == "delete":
+        delete_count = op2.get("count", 1)
         if op1["pos"] <= op2["pos"]:
             return op1  # No change needed
-        else:
+        elif op1["pos"] > op2["pos"] + delete_count:
+            # Insert is after the deleted section
             return {
                 "action": "insert",
-                "pos": op1["pos"] - 1,
+                "pos": op1["pos"] - delete_count,
+                "char": op1["char"],
+                "author": op1["author"]
+            }
+        else:
+            # Insert is within the deleted section, move to deletion point
+            return {
+                "action": "insert",
+                "pos": op2["pos"],
                 "char": op1["char"],
                 "author": op1["author"]
             }
@@ -60,20 +70,51 @@ def transform_operation(op1, op2):
             return {
                 "action": "delete",
                 "pos": op1["pos"] + len(op2["char"]),
+                "count": op1.get("count", 1),
                 "author": op1["author"]
             }
     
     elif op1["action"] == "delete" and op2["action"] == "delete":
+        delete_count1 = op1.get("count", 1)
+        delete_count2 = op2.get("count", 1)
+        
         if op1["pos"] < op2["pos"]:
+            # Delete1 is before Delete2
             return op1  # No change needed
-        elif op1["pos"] > op2["pos"]:
+        elif op1["pos"] >= op2["pos"] + delete_count2:
+            # Delete1 is after Delete2
             return {
                 "action": "delete",
-                "pos": op1["pos"] - 1,
+                "pos": op1["pos"] - delete_count2,
+                "count": delete_count1,
                 "author": op1["author"]
             }
         else:
-            return None  # Both operations delete the same character
+            # Delete1 overlaps with Delete2
+            overlap_start = max(op1["pos"], op2["pos"])
+            overlap_end = min(op1["pos"] + delete_count1, op2["pos"] + delete_count2)
+            overlap_size = overlap_end - overlap_start
+            
+            if op1["pos"] < op2["pos"]:
+                # Delete1 starts before Delete2
+                return {
+                    "action": "delete",
+                    "pos": op1["pos"],
+                    "count": delete_count1 - overlap_size,
+                    "author": op1["author"]
+                }
+            else:
+                # Delete1 starts within or after Delete2
+                remaining_count = delete_count1 - overlap_size
+                if remaining_count <= 0:
+                    return None  # Operation is nullified
+                else:
+                    return {
+                        "action": "delete",
+                        "pos": op2["pos"],
+                        "count": remaining_count,
+                        "author": op1["author"]
+                    }
 
 def generate_color():
     r = random.randint(50, 255)
@@ -127,40 +168,36 @@ async def handle_message(ws, msg):
         author = data["author"]
         base_version = data.get("baseVersion", VERSION)
         
-        # Transform operation against concurrent operations
-        if base_version < VERSION:
-            for i in range(base_version, VERSION):
-                concurrent_op = OPERATIONS[i]
-                if concurrent_op["author"] != author:  # Only transform against other users' ops
-                    op = transform_operation(op, concurrent_op)
-                    if op is None:  # Operation was nullified by transformation
-                        break
+        # Store operation in history with metadata
+        operation = {
+            "action": op["action"],
+            "pos": op["pos"],
+            "char": op.get("char", ""),  # For insert operations
+            "count": op.get("count", 1),  # For delete operations, default to 1
+            "author": author,
+            "version": VERSION,
+            "baseVersion": base_version
+        }
+        OPERATIONS.append(operation)
         
-        if op:  # If operation wasn't nullified
-            if op["action"] == "insert":
-                DOCUMENT = DOCUMENT[:op["pos"]] + op["char"] + DOCUMENT[op["pos"]:]
-            elif op["action"] == "delete":
-                if 0 <= op["pos"] < len(DOCUMENT):
-                    DOCUMENT = DOCUMENT[:op["pos"]] + DOCUMENT[op["pos"] + 1:]
-            
-            # Store operation in history
-            OPERATIONS.append({
-                "action": op["action"],
-                "pos": op["pos"],
-                "char": op.get("char", ""),
-                "author": author,
-                "version": VERSION
-            })
-            
-            VERSION += 1
-            
-            # Broadcast transformed operation
-            await broadcast(json.dumps({
-                "type": "edit",
-                "op": op,
-                "version": VERSION,
-                "author": author
-            }), exclude=ws)
+        # Apply operation to document
+        if op["action"] == "insert":
+            DOCUMENT = DOCUMENT[:op["pos"]] + op["char"] + DOCUMENT[op["pos"]:]
+        elif op["action"] == "delete":
+            delete_count = op.get("count", 1)  # Get count or default to 1
+            if 0 <= op["pos"] < len(DOCUMENT):
+                DOCUMENT = DOCUMENT[:op["pos"]] + DOCUMENT[op["pos"] + delete_count:]
+        
+        VERSION += 1
+        
+        # Broadcast operation with version information
+        await broadcast(json.dumps({
+            "type": "edit",
+            "op": op,
+            "version": VERSION,
+            "baseVersion": base_version,
+            "author": author
+        }), exclude=ws)
 
 
     elif msg_type == "cursor":
