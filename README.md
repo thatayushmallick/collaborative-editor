@@ -13,11 +13,11 @@ A brief walkthrough of the project :
 
 Built by :
 
-- Ayush Mallick
-- Mann Maru
-- Shashwat Shourya
-- Kamlesh Bera
-- Suharsh Agrawal
+- [Ayush Mallick](https://github.com/thatayushmallick)
+- [Mann Maru](https://github.com/mannm2406)
+- [Shashwat Shourya](https://github.com/K12TK013A1N)
+- [Kamlesh Bera](https://github.com/HeyyKamleshh)
+- [Suharsh Agrawal](https://github.com/suharsh592)
 
   as part of an academic course project.
 
