@@ -4,9 +4,18 @@ import json
 import random
 import time
 import socket
-# Add these imports at the top of your file
 import dns.resolver
 import traceback
+
+
+DOCUMENT = ""
+VERSION = 0
+OPERATIONS = []  # History of operations
+CLIENTS = set()
+CURSORS = {}
+CLIENT_IDS = {}
+CLIENT_COLORS = {}
+CLIENT_PINGS = {}  # {client_id: ping_in_ms}
 
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -18,16 +27,6 @@ def get_local_ip():
     finally:
         s.close()
     return local_ip
-
-# Add to global variables at the top of server.py
-DOCUMENT = ""
-VERSION = 0
-OPERATIONS = []  # History of operations
-CLIENTS = set()
-CURSORS = {}
-CLIENT_IDS = {}
-CLIENT_COLORS = {}
-CLIENT_PINGS = {}  # {client_id: ping_in_ms}
 
 def transform_operation(op1, op2):
     """Transform op1 against op2."""

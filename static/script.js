@@ -1,27 +1,21 @@
 const serverIp = window.location.hostname || 'localhost';
-        
-
 const textarea = document.getElementById('editor');
 const overlay = document.getElementById('overlay');
 const userListItems = document.getElementById('userListItems');
-
 const usernameContainer = document.getElementById('username-container');
 const usernameInput = document.getElementById('username-input');
 const serverInput = document.getElementById('server-input');
 const dnsCont = document.getElementById('dns-resolver');
 const pingVis = document.getElementById('ping-visualization')
-
 const joinButton = document.getElementById('join-button');
 const wrapper = document.getElementById('wrapper');
 
-// Add these variables to your existing variables
+
 let pingChart = null;
 let pingHistory = {
   timestamps: [],
   values: []
 };
-
-
 let ws = '';
 let clientId = "";
 let version = 0;
@@ -45,7 +39,6 @@ usernameInput.addEventListener('keypress', function(event) {
     document.getElementById('join-button').click();
     }
 })
-
 serverInput.addEventListener('keypress', function(event) {
   if (event.key === 'Enter') {
   // Prevent default action to avoid form submission if inside a form
@@ -626,12 +619,7 @@ function saveCursorPosition(element) {
       console.error("Error restoring cursor position:", e);
     }
   }
-  /**
- * Finds the difference between two strings and returns an operation object
- * @param {string} oldText - The previous text state
- * @param {string} newText - The current text state
- * @returns {object|null} - An operation object with action, position, and character(s), or null if no change
- */
+
   function findDiff(oldText, newText) {
     // If texts are identical, no change occurred
     if (oldText === newText) return null;
